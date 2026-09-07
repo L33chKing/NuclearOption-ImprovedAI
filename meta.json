@@ -1,0 +1,1 @@
+{"id":"ImprovedAI","artifact":{"fileName":"ImprovedAI.dll","version":"0.9.114","category":"Release","type":"plugin","gameVersion":"0.34.1","downloadUrl":null,"downloadURL":null,"hash":null,"extends":null,"dependencies":[{"id":"BepInEx.ConfigurationManager","version":"18.4.1"}],"incompatibilities":[]}}

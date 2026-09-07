@@ -1,0 +1,14 @@
+# Build artifact (rebuilt via src/build.ps1 or src/build.sh; attach to Releases instead)
+ImprovedAI.dll
+
+# Local review snapshots (kept on your disk only, not for the public repo)
+backup_*/
+
+# .NET / compiler leftovers (in case you ever build outside the scripted path)
+bin/
+obj/
+*.log
+
+# Local working docs (kept on your disk only; the public repo carries README.md alone)
+*.md
+!README.md
