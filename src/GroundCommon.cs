@@ -14,7 +14,12 @@ public partial class ImprovedAIPlugin
     static AccessTools.FieldRef<GroundVehicle, PathfindingAgent> gvPathfinder;
     static AccessTools.FieldRef<GroundVehicle, bool> gvNavigate, gvCommanded, gvMobile, gvResetStationary;
     static AccessTools.FieldRef<Turret, Unit> turretTarget;   // what a turret is currently engaging
-    static AccessTools.FieldRef<GroundVehicle, NuclearOption.Jobs.PtrAllocation<NuclearOption.Jobs.GroundVehicleFields>> gvJobFields; // physics job state (reverse / halt-facing / downforce)
+    // NOTE: JobFields is a Burst unmanaged struct (PtrAllocation<T> contains a raw T*). AccessTools.FieldRefAccess
+    // on it builds a DynamicMethod via MonoMod Cecil import, which hard-crashes Unity Mono (native crash in
+    // Type.IsValueType, uncatchable by try/catch — see Player.log crash in GroundCommonBind). So we bind it as a
+    // plain FieldInfo (no codegen) and operate on a COPY: the copy shares the native ptr, so Ref() mutations
+    // still hit the live job memory. Null = feature disabled (same contract as before).
+    static System.Reflection.FieldInfo gvJobFieldsInfo;
 
     // Bind all shared reflection handles. Each failure nulls only its own feature.
     void GroundCommonBind()
@@ -27,14 +32,32 @@ public partial class ImprovedAIPlugin
             gvMobile = AccessTools.FieldRefAccess<GroundVehicle, bool>("mobile");
             gvResetStationary = AccessTools.FieldRefAccess<GroundVehicle, bool>("resetStationary");
             turretTarget = AccessTools.FieldRefAccess<Turret, Unit>("target");
-            try { gvJobFields = AccessTools.FieldRefAccess<GroundVehicle, NuclearOption.Jobs.PtrAllocation<NuclearOption.Jobs.GroundVehicleFields>>("JobFields"); }
-            catch (Exception ex) { gvJobFields = null; Logger.LogWarning("Reverse-retreat unavailable (JobFields access failed): " + ex.Message); }
+            try { gvJobFieldsInfo = AccessTools.Field(typeof(GroundVehicle), "JobFields"); if (gvJobFieldsInfo == null) throw new MissingFieldException("GroundVehicle", "JobFields"); }
+            catch (Exception ex) { gvJobFieldsInfo = null; Logger.LogWarning("Reverse-retreat unavailable (JobFields access failed): " + ex.Message); }
             try { gvUpdateObstacles = AccessTools.Method(typeof(GroundVehicle), "UpdateObstacles"); gvObstacles = AccessTools.FieldRefAccess<GroundVehicle, List<Obstacle>>("obstacles"); }
             catch (Exception ex) { gvUpdateObstacles = null; gvObstacles = null; Logger.LogWarning("Obstacle avoidance unavailable: " + ex.Message); }
             try { paUnit = AccessTools.FieldRefAccess<PathfindingAgent, Unit>("unit"); }
             catch (Exception ex) { paUnit = null; Logger.LogWarning("Steer-layer routing unavailable (PathfindingAgent.unit): " + ex.Message); }
         }
         catch (Exception ex) { gvPathfinder = null; Logger.LogError("Improved AI ground-forces init failed (feature disabled): " + ex); }
+    }
+
+    // Safe JobFields read: boxed COPY via FieldInfo.GetValue (no DynamicMethod, never hard-crashes).
+    // The struct only holds a native pointer, so mutating via copy.Ref() still writes the live job memory.
+    // Returns false when unavailable (feature silently disabled, same as gvJobFields==null before).
+    static bool TryGetGroundJob(GroundVehicle v, out NuclearOption.Jobs.PtrAllocation<NuclearOption.Jobs.GroundVehicleFields> job)
+    {
+        job = default;
+        try
+        {
+            var fi = gvJobFieldsInfo;
+            if (fi == null || v == null) return false;
+            object o = fi.GetValue(v);
+            if (o == null) return false;
+            job = (NuclearOption.Jobs.PtrAllocation<NuclearOption.Jobs.GroundVehicleFields>)o;
+            return true;
+        }
+        catch { return false; }
     }
 
     // ---- generic geometry helpers ----

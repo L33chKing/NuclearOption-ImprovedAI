@@ -186,9 +186,8 @@ public partial class ImprovedAIPlugin
             gvTopOn(v) *= speedMul; gvTopOff(v) *= speedMul; gvAccel(v) *= accelMul;
             // 2) CRITICAL: GetOrCreateJobField copies topSpeed/accel into the Burst job struct ONCE and UpdateJobFields
             //    never refreshes them — so if the job is already created, patch its copy too or the change is ignored.
-            if (gvJobFields != null)
+            if (gvJobFieldsInfo != null && TryGetGroundJob(v, out var jf))
             {
-                ref var jf = ref gvJobFields(v);
                 if (jf.IsCreated) { jf.Ref().topSpeedOnroad *= speedMul; jf.Ref().topSpeedOffroad *= speedMul; jf.Ref().acceleration *= accelMul; }
             }
             if (cfgDiag != null && cfgDiag.Value) Log?.LogInfo($"[Personality] {v.name} speed x{speedMul} accel x{accelMul} (topOnroad {on0:0.0}->{gvTopOn(v):0.0})");
@@ -204,9 +203,8 @@ public partial class ImprovedAIPlugin
             if (v.rb != null) v.rb.mass *= mul;                                   // weight (job snapshots mass from rb)
             if (gvSpring != null) gvSpring(v) *= mul;
             if (gvDamping != null) gvDamping(v) *= mul;
-            if (gvJobFields != null)
+            if (gvJobFieldsInfo != null && TryGetGroundJob(v, out var jf))
             {
-                ref var jf = ref gvJobFields(v);
                 if (jf.IsCreated)
                 {
                     jf.Ref().mass *= mul;

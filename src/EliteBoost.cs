@@ -27,7 +27,8 @@ public partial class ImprovedAIPlugin
     const float ShipYawSmooth = 0.08f;                 // low-pass factor for the steady-turn yaw rate (~0.25s @50Hz); higher = passes faster turns undamped
     static readonly Dictionary<Ship, float> eShipYawSmoothed = new Dictionary<Ship, float>();   // per-ship low-passed yaw rate (the "intended" turn)
     static AccessTools.FieldRef<ControlSurface, Aircraft> eCsAircraft;   // ControlSurface.aircraft back-ref
-    static AccessTools.FieldRef<ControlSurface, NuclearOption.Jobs.PtrAllocation<NuclearOption.Jobs.ControlSurfaceFields>> eCsJobFields;  // the Burst job copy — pitchRange/rollRange are snapshotted here ONCE at Awake and never refreshed, so this (not the C# field) is the live authority
+    // Same native-crash caveat as GroundCommon gvJobFieldsInfo: never FieldRefAccess a PtrAllocation (raw T*).
+    static System.Reflection.FieldInfo eCsJobFieldsInfo;  // the Burst job copy — pitchRange/rollRange are snapshotted here ONCE at Awake and never refreshed, so this (not the C# field) is the live authority
     static readonly Dictionary<ControlSurface, Vector2> csBaseRange = new Dictionary<ControlSurface, Vector2>();  // ControlSurface -> ORIGINAL (pitchRange, rollRange) from the job (idempotent live scale)
     static AccessTools.FieldRef<Turbojet, float> eTjMaxSpeed;    // private Turbojet.maxSpeed — a HARD thrust cutoff = the top-speed wall
     static AccessTools.FieldRef<DuctedFan, float> eDfMaxThrust;  // private DuctedFan.maxThrust (computed from power at init)
@@ -65,9 +66,9 @@ public partial class ImprovedAIPlugin
         try
         {
             eCsAircraft = AccessTools.FieldRefAccess<ControlSurface, Aircraft>("aircraft");
-            eCsJobFields = AccessTools.FieldRefAccess<ControlSurface, NuclearOption.Jobs.PtrAllocation<NuclearOption.Jobs.ControlSurfaceFields>>("JobFields");
+            eCsJobFieldsInfo = AccessTools.Field(typeof(ControlSurface), "JobFields"); if (eCsJobFieldsInfo == null) throw new MissingFieldException("ControlSurface", "JobFields");
         }
-        catch (Exception ex) { eCsAircraft = null; eCsJobFields = null; Logger.LogWarning("[Elite] control-surface fields unavailable (aircraft turn boost off): " + ex); }
+        catch (Exception ex) { eCsAircraft = null; eCsJobFieldsInfo = null; Logger.LogWarning("[Elite] control-surface fields unavailable (aircraft turn boost off): " + ex); }
         try { eTjMaxSpeed = AccessTools.FieldRefAccess<Turbojet, float>("maxSpeed"); }
         catch (Exception ex) { eTjMaxSpeed = null; Logger.LogWarning("[Elite] Turbojet.maxSpeed unavailable (jet top-speed cap won't be lifted): " + ex); }
         try { eDfMaxThrust = AccessTools.FieldRefAccess<DuctedFan, float>("maxThrust"); }
@@ -286,13 +287,13 @@ public partial class ImprovedAIPlugin
     // Live control-surface authority scaling in the Burst job (spawn-time scaling was a no-op).
     internal static void EliteScaleControlSurface(ControlSurface cs)
     {
-        if (!MasterOn || !EliteAirManeuver || cs == null || eCsAircraft == null || eCsJobFields == null) return;
+        if (!MasterOn || !EliteAirManeuver || cs == null || eCsAircraft == null || eCsJobFieldsInfo == null) return;
         Aircraft ac; try { ac = eCsAircraft(cs); } catch { return; }
         if (ac == null || PlayerProtected(ac)) return;
         float f = EliteFactor(GetUnitSkill(ac), EliteTurnMult);
         try
         {
-            ref var jf = ref eCsJobFields(cs);
+            var jf = (NuclearOption.Jobs.PtrAllocation<NuclearOption.Jobs.ControlSurfaceFields>)eCsJobFieldsInfo.GetValue(cs);
             if (!jf.IsCreated) return;
             ref var r = ref jf.Ref();
             if (!csBaseRange.TryGetValue(cs, out var b)) { b = new Vector2(r.pitchRange, r.rollRange); csBaseRange[cs] = b; }

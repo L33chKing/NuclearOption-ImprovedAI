@@ -6,7 +6,7 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 
-[BepInPlugin(GUID, "Improved AI", "0.9.116")]
+[BepInPlugin(GUID, "Improved AI", "0.9.117")]
 public partial class ImprovedAIPlugin : BaseUnityPlugin
 {
     public const string GUID = "com.leech.improvedai";
@@ -55,7 +55,7 @@ public partial class ImprovedAIPlugin : BaseUnityPlugin
             var h = new Harmony(GUID);
             h.PatchAll(typeof(ImprovedAIPlugin).Assembly);
             int patched = 0; foreach (var _ in h.GetPatchedMethods()) patched++;
-            Logger.LogInfo($"Improved AI 0.9.116 loaded — {patched} method(s) patched.");
+            Logger.LogInfo($"Improved AI 0.9.117 loaded — {patched} method(s) patched.");
         }
         catch (Exception ex) { Logger.LogError("Improved AI failed to initialise: " + ex); }
     }

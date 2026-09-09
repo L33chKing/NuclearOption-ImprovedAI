@@ -585,10 +585,10 @@ public partial class ImprovedAIPlugin
     // Hide near large obstacles from vanilla's Burst avoidance (A* owns them instead). Small ones keep vanilla spacing.
     internal static void GroundBlankLargeObstacles(GroundVehicle v)
     {
-        if (!MasterOn || gvJobFields == null || v == null || v.remoteSim) return;
+        if (!MasterOn || gvJobFieldsInfo == null || v == null || v.remoteSim) return;
         try
         {
-            ref var jf = ref gvJobFields(v);
+            if (!TryGetGroundJob(v, out var jf)) return;
             if (!jf.IsCreated) return;
             var arr = jf.Ref().ObstaclesArray;
             Vector3 self = v.transform.position; float rng2 = NavBlankRange * NavBlankRange;

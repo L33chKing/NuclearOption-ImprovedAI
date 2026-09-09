@@ -305,14 +305,14 @@ public partial class ImprovedAIPlugin
     // leaves these inputs alone: steering 0, throttle -1, brake 0. Never via reverseTimer (unblind wiggle) or brake.
     internal static void GroundApplyReverse(GroundVehicle v)
     {
-        if (!MasterOn || gvJobFields == null || cfgGroundReverse == null || !cfgGroundReverse.Value) return;
+        if (!MasterOn || gvJobFieldsInfo == null || cfgGroundReverse == null || !cfgGroundReverse.Value) return;
         if (v == null || v.remoteSim) return;
         if (!gStates.TryGetValue(v.GetInstanceID(), out var s) || !s.owned || s.state != GCombat.Retreat) return;
         if (Time.timeSinceLevelLoad >= s.reverseUntil) return;
         if (v.speed > ReverseStopSpeed) return;   // still carrying forward momentum -> stop first, don't back yet
         try
         {
-            ref var jf = ref gvJobFields(v);
+            if (!TryGetGroundJob(v, out var jf)) return;
             if (jf.IsCreated) { jf.Ref().inputs.steering = 0f; jf.Ref().inputs.throttle = -1f; jf.Ref().inputs.brake = 0f; }
             gvResetStationary(v) = true;
         }
@@ -324,7 +324,7 @@ public partial class ImprovedAIPlugin
     // Reverse needs Turn To Face on, else the pivot never aims the nose and backing stays blind.
     internal static void GroundApplyHaltFacing(GroundVehicle v)
     {
-        if (!MasterOn || gvJobFields == null || v == null || v.remoteSim) return;
+        if (!MasterOn || gvJobFieldsInfo == null || v == null || v.remoteSim) return;
         if (!gStates.TryGetValue(v.GetInstanceID(), out var s) || !s.owned) return;
         if (Time.timeSinceLevelLoad < s.reverseUntil) return;   // reverse live: GroundApplyReverse already drove this frame — hands off entirely
         if (s.state == GCombat.Retreat && s.hasIssued) return;  // driving out on a waypoint: driver owns inputs — hands off
@@ -333,7 +333,7 @@ public partial class ImprovedAIPlugin
         if (s.state != GCombat.Engage && !(s.state == GCombat.Retreat && !s.hasIssued)) return;
         try
         {
-            ref var jf = ref gvJobFields(v);
+            if (!TryGetGroundJob(v, out var jf)) return;
             if (!jf.IsCreated) return;
             float steer = 0f;
             if (cfgGroundHaltFace != null && cfgGroundHaltFace.Value && s.hasHaltFace)
